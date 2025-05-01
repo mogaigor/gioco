@@ -181,13 +181,16 @@ function animate() {
   enemy.velocity.x = 0
 
   // player movement
-
   if (keys.a.pressed && player.lastKey === 'a') {
-    player.velocity.x = -5
-    player.switchSprite('run')
+    if (player.position.x > 0) { // Limite sinistro
+      player.velocity.x = -5
+      player.switchSprite('run')
+    }
   } else if (keys.d.pressed && player.lastKey === 'd') {
-    player.velocity.x = 5
-    player.switchSprite('run')
+    if (player.position.x + player.width < canvas.width) { // Limite destro
+      player.velocity.x = 5
+      player.switchSprite('run')
+    }
   } else {
     player.switchSprite('idle')
   }
@@ -201,11 +204,15 @@ function animate() {
 
   // Enemy movement
   if (keys.ArrowLeft.pressed && enemy.lastKey === 'ArrowLeft') {
-    enemy.velocity.x = -5
-    enemy.switchSprite('run')
+    if (enemy.position.x > 0) { // Limite sinistro
+      enemy.velocity.x = -5
+      enemy.switchSprite('run')
+    }
   } else if (keys.ArrowRight.pressed && enemy.lastKey === 'ArrowRight') {
-    enemy.velocity.x = 5
-    enemy.switchSprite('run')
+    if (enemy.position.x + enemy.width < canvas.width) { // Limite destro
+      enemy.velocity.x = 5
+      enemy.switchSprite('run')
+    }
   } else {
     enemy.switchSprite('idle')
   }
