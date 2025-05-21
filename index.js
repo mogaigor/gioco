@@ -1,6 +1,5 @@
-const canvas = document.querySelector('canvas')
+const canvas = document.getElementById('gameCanvas')
 const c = canvas.getContext('2d')
-
 canvas.width = 1024
 canvas.height = 576
 
@@ -67,6 +66,10 @@ const player = new Fighter({
       imageSrc: './img/samuraiMack/Attack1.png',
       framesMax: 6
     },
+    attack3: {
+      imageSrc: './img/samuraiMack/Attack3.png',
+      framesMax: 8
+    },
     takeHit: {
       imageSrc: './img/samuraiMack/Take Hit - white silhouette.png',
       framesMax: 4
@@ -128,6 +131,10 @@ const enemy = new Fighter({
       imageSrc: './img/kenji/Attack1.png',
       framesMax: 4
     },
+    attack3: {
+      imageSrc: './img/kenji/Attack3.png',
+      framesMax: 4
+    },
     takeHit: {
       imageSrc: './img/kenji/Take hit.png',
       framesMax: 3
@@ -166,7 +173,45 @@ const keys = {
 
 decreaseTimer()
 
+let gamePaused = false
+
+function determineWinner({ player, enemy, timerId }) {
+  clearTimeout(timerId)
+  document.getElementById('displayText').style.display = 'flex'
+  document.getElementById('restartBtn').style.display = 'none'
+
+  let winnerText = ''
+  if (player.health === enemy.health) {
+    winnerText = 'Tie'
+  } else if (player.health > enemy.health) {
+    winnerText = 'Player 1 wins'
+  } else {
+    winnerText = 'Player 2 wins'
+  }
+
+  // Countdown di 5 secondi
+  let countdown = 5
+  document.getElementById('displayText').innerHTML = `${winnerText}<br>Restart in ${countdown}...`
+  const countdownInterval = setInterval(() => {
+    countdown--
+    document.getElementById('displayText').innerHTML = `${winnerText}<br>Restart in ${countdown}...`
+    if (countdown === 0) {
+      clearInterval(countdownInterval)
+      gamePaused = true
+      document.getElementById('restartBtn').style.display = 'block'
+      document.getElementById('displayText').innerHTML = winnerText
+    }
+  }, 1000)
+}
+
+// Quando il timer arriva a 0:
+if (timer === 0) {
+  determineWinner({ player, enemy, timerId })
+}
+
 function animate() {
+  if (gamePaused) return // Blocca tutto se il gioco è in pausa
+
   window.requestAnimationFrame(animate)
   c.fillStyle = 'black'
   c.fillRect(0, 0, canvas.width, canvas.height)
@@ -174,6 +219,10 @@ function animate() {
   shop.update()
   c.fillStyle = 'rgba(255, 255, 255, 0.15)'
   c.fillRect(0, 0, canvas.width, canvas.height)
+
+  // --- Barra ricarica blast ---
+  drawBlastBars()
+
   player.update()
   enemy.update()
 
@@ -268,6 +317,40 @@ function animate() {
     enemy.isAttacking = false
   }
 
+  // Collisione proiettili player -> enemy
+  player.projectiles.forEach((projectile) => {
+    if (
+      projectile.active &&
+      projectile.position.x + projectile.size > enemy.position.x &&
+      projectile.position.x < enemy.position.x + enemy.width &&
+      projectile.position.y + projectile.size > enemy.position.y &&
+      projectile.position.y < enemy.position.y + enemy.height
+    ) {
+      enemy.takeHit(30) // 30 punti danno per il blast
+      projectile.active = false
+      gsap.to('#enemyHealth', {
+        width: enemy.health + '%'
+      })
+    }
+  })
+
+  // Collisione proiettili enemy -> player
+  enemy.projectiles.forEach((projectile) => {
+    if (
+      projectile.active &&
+      projectile.position.x + projectile.size > player.position.x &&
+      projectile.position.x < player.position.x + player.width &&
+      projectile.position.y + projectile.size > player.position.y &&
+      projectile.position.y < player.position.y + player.height
+    ) {
+      player.takeHit(30) // 30 punti danno per il blast
+      projectile.active = false
+      gsap.to('#playerHealth', {
+        width: player.health + '%'
+      })
+    }
+  })
+
   // end game based on health
   if (enemy.health <= 0 || player.health <= 0) {
     determineWinner({ player, enemy, timerId })
@@ -288,10 +371,13 @@ window.addEventListener('keydown', (event) => {
         player.lastKey = 'a'
         break
       case 'w':
-        player.velocity.y = -20
+        if (player.velocity.y === 0) player.velocity.y = -20
         break
-      case ' ':
+      case ' ': // SPAZIO per attacco normale player 1
         player.attack()
+        break
+      case 'Shift': // Blast player 1
+        player.blast()
         break
     }
   }
@@ -307,11 +393,13 @@ window.addEventListener('keydown', (event) => {
         enemy.lastKey = 'ArrowLeft'
         break
       case 'ArrowUp':
-        enemy.velocity.y = -20
+        if (enemy.velocity.y === 0) enemy.velocity.y = -20
         break
-      case 'ArrowDown':
+      case 'ArrowDown': // FRECCIA IN BASSO per attacco normale player 2
         enemy.attack()
-
+        break
+      case '.': // Blast player 2
+        enemy.blast()
         break
     }
   }
@@ -325,10 +413,6 @@ window.addEventListener('keyup', (event) => {
     case 'a':
       keys.a.pressed = false
       break
-  }
-
-  // enemy keys
-  switch (event.key) {
     case 'ArrowRight':
       keys.ArrowRight.pressed = false
       break
@@ -337,3 +421,53 @@ window.addEventListener('keyup', (event) => {
       break
   }
 })
+
+function drawBlastBars() {
+  // Parametri barra player
+  const barWidth = 200
+  const barHeight = 8
+  const barX = 50
+  const barY = 62 // Sotto la barra della vita player
+
+  // Parametri barra enemy
+  const barWidthEnemy = 200
+  const barHeightEnemy = 8
+  const barXEnemy = canvas.width - barWidth - 50
+  const barYEnemy = 62 // Sotto la barra della vita enemy
+
+  // Calcolo percentuale ricarica
+  const now = Date.now()
+  const playerElapsed = Math.min(now - player.lastBlast, player.blastCooldown)
+  const playerPercent = playerElapsed / player.blastCooldown
+
+  const enemyElapsed = Math.min(now - enemy.lastBlast, enemy.blastCooldown)
+  const enemyPercent = enemyElapsed / enemy.blastCooldown
+
+  // Player blast bar
+  c.save()
+  c.globalAlpha = 0.85
+  c.fillStyle = "#222"
+  c.fillRect(barX, barY, barWidth, barHeight)
+  c.fillStyle = "#facc15"
+  c.fillRect(barX, barY, barWidth * playerPercent, barHeight)
+  c.strokeStyle = "#fff"
+  c.lineWidth = 2
+  c.strokeRect(barX, barY, barWidth, barHeight)
+  c.restore()
+
+  // Enemy blast bar
+  c.save()
+  c.globalAlpha = 0.85
+  c.fillStyle = "#222"
+  c.fillRect(barXEnemy, barYEnemy, barWidthEnemy, barHeightEnemy)
+  c.fillStyle = "#facc15"
+  c.fillRect(barXEnemy, barYEnemy, barWidthEnemy * enemyPercent, barHeightEnemy)
+  c.strokeStyle = "#fff"
+  c.lineWidth = 2
+  c.strokeRect(barXEnemy, barYEnemy, barWidthEnemy, barHeightEnemy)
+  c.restore()
+}
+
+document.getElementById('restartBtn').onclick = function() {
+  window.location.reload()
+}
