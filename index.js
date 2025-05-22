@@ -189,17 +189,21 @@ function determineWinner({ player, enemy, timerId }) {
     winnerText = 'Player 2 wins'
   }
 
-  // Countdown di 5 secondi
+  document.getElementById('displayText').innerHTML = winnerText
+
+  // Countdown di 5 secondi nel div restartTimer
   let countdown = 5
-  document.getElementById('displayText').innerHTML = `${winnerText}<br>Restart in ${countdown}...`
+  const restartTimer = document.getElementById('restartTimer')
+  restartTimer.style.display = 'block'
+  restartTimer.innerHTML = `Restart tra ${countdown}...`
   const countdownInterval = setInterval(() => {
     countdown--
-    document.getElementById('displayText').innerHTML = `${winnerText}<br>Restart in ${countdown}...`
+    restartTimer.innerHTML = `Restart tra ${countdown}...`
     if (countdown === 0) {
       clearInterval(countdownInterval)
       gamePaused = true
       document.getElementById('restartBtn').style.display = 'block'
-      document.getElementById('displayText').innerHTML = winnerText
+      restartTimer.style.display = 'none'
     }
   }, 1000)
 }
@@ -470,4 +474,30 @@ function drawBlastBars() {
 
 document.getElementById('restartBtn').onclick = function() {
   window.location.reload()
+}
+
+function showRestartCountdown(seconds = 5) {
+  const restartTimer = document.getElementById('restartTimer');
+  restartTimer.style.display = 'block';
+  let counter = seconds;
+  restartTimer.innerText = `Restart in ${counter}`;
+
+  const intervalId = setInterval(() => {
+    counter--;
+    restartTimer.innerText = `Restart in ${counter}`;
+    if (counter === 0) {
+      clearInterval(intervalId);
+      restartTimer.style.display = 'none';
+      document.getElementById('restartBtn').style.display = 'block';
+    }
+  }, 1000);
+}
+
+// Quando il gioco finisce, chiama showRestartCountdown()
+function endGame(reason) {
+  gameEnded = true;
+  clearTimeout(timerId);
+  document.getElementById('displayText').style.display = 'flex';
+  showRestartCountdown(0);
+  document.getElementById('restartBtn').style.display = 'none';
 }
